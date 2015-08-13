@@ -399,7 +399,7 @@ namespace D_Parser.Resolver.TypeResolution
 			return false;
 		}
 
-		static bool CheckAndDeduceTypeAgainstTplParameter(TemplateParameter handledParameter, 
+		public static bool CheckAndDeduceTypeAgainstTplParameter(TemplateParameter handledParameter, 
 			ISemantic argumentToCheck,
 			DeducedTypeDictionary deducedTypes,
 			ResolutionContext ctxt)
