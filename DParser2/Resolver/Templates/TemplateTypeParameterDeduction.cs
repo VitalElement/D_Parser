@@ -37,7 +37,7 @@ namespace D_Parser.Resolver.Templates
 		{
 			if (p == null || p.Default == null)
 				return false;
-
+			// Do the same stuff like in AbstractVisitor, just don't allow pushing DMethods but always its parent + introduce templateparametersymbols in the current resolution scope
 			using (ctxt.Push(DResolver.SearchBlockAt(ctxt.ScopedBlock.NodeRoot as IBlockNode, p.Default.Location), p.Default.Location))
 			{
 				var defaultTypeRes = TypeDeclarationResolver.ResolveSingle(p.Default, ctxt);

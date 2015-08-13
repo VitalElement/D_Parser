@@ -808,8 +808,9 @@ namespace D_Parser.Resolver.TypeResolution
 
 			/*
 			 * Pushing a new scope is only required if current scope cannot be found in the handled node's hierarchy.
-			 * Edit: No, it is required nearly every time because of nested type declarations - then, we do need the 
+			 * Edit: No, it is required nearly[1] every time because of nested type declarations - then, we do need the
 			 * current block scope.
+			 * [1] Edit2: Not when we are currently handling method parameters.
 			 */
 			var options = ctxt.CurrentContext.ContextDependentOptions;
 			var applyOptions = ctxt.ScopedBlockIsInNodeHierarchy(m);

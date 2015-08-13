@@ -11,6 +11,7 @@ using D_Parser.Resolver.ExpressionSemantics;
 using D_Parser.Resolver.TypeResolution;
 using System.Threading.Tasks;
 using System.Threading;
+using D_Parser.Resolver.Templates;
 
 namespace D_Parser.Resolver.ASTScanner
 {
@@ -173,7 +174,25 @@ to avoid op­er­a­tions which are for­bid­den at com­pile time.",
 						EndLocation = dm.OutResultVariable.EndLocation
 					}, parms);
 
-				HandleItems(dm.Parameters, parms);
+				if (dm.Parameters.Count > 0) {
+					// Push the method's parent on top because
+					// a parameter can't be of a nested type that is declared somewhere in the method itself(, right?)
+					// Still, resolve the method's template parameters.
+					DeducedTypeDictionary dtd = new DeducedTypeDictionary(dm);
+					if (dm.TemplateParameters != null)
+						foreach (var tp in dm.TemplateParameters)
+							if (TemplateInstanceHandler.HasDefaultType (tp)) {
+								TemplateInstanceHandler.CheckAndDeduceTypeAgainstTplParameter (tp, null, dtd, ctxt);
+							}
+
+					using (ctxt.Push (dm.Parent, dm.Location, true)) {
+						//What if the context is actually inside the method?
+						//Answer: We want to resolve parameters' types, not those of locals.
+						ctxt.CurrentContext.DeducedTemplateParameters.Add(dtd);
+
+						HandleItems (dm.Parameters, parms);
+					}
+				}
 
 				if (dm.TemplateParameters != null)
 					HandleItems(dm.TemplateParameterNodes, parms);

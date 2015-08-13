@@ -337,6 +337,7 @@
     <Compile Include="Resolver\Caching\ResolutionCache.cs" />
     <Compile Include="Resolver\Caching\ExpressionCache.cs" />
     <Compile Include="Resolver\TypeResolution\LooseResolution.cs" />
+    <Compile Include="Resolver\LazyBaseTypeResolution.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="readme.txt" />
