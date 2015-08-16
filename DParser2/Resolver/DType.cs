@@ -244,11 +244,24 @@ namespace D_Parser.Resolver
 	#region Derived data types
 	public abstract class DerivedDataType : AbstractType
 	{
-		public readonly AbstractType Base;
+		internal readonly BaseTypeResolutionVisitor.Wrapper baseType;
 
-		protected DerivedDataType(AbstractType Base)
+		public virtual AbstractType Base
 		{
-			this.Base = Base;
+			get {
+				return baseType;
+			}
+		}
+
+		protected DerivedDataType(AbstractType @base, bool setNonStaticAccess = false)
+		{
+			baseType = @base;
+			baseType.NonStaticAccess = setNonStaticAccess;
+		}
+
+		protected virtual AbstractType CloneBase(bool cloneBase)
+		{
+			return baseType.Clone(cloneBase);
 		}
 	}
 
@@ -258,7 +271,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new PointerType(cloneBase && Base != null ? Base.Clone(true) : Base);
+			return new PointerType(CloneBase(cloneBase));
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -290,9 +303,9 @@ namespace D_Parser.Resolver
 		public override AbstractType Clone(bool cloneBase)
 		{
 			if(IsStaticArray)
-				return new ArrayType(cloneBase && Base != null ? Base.Clone(true) : Base);
+				return new ArrayType(CloneBase(cloneBase));
 			
-			return new ArrayType(cloneBase && Base != null ? Base.Clone(true) : Base, FixedLength);
+			return new ArrayType(CloneBase(cloneBase), FixedLength);
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -308,7 +321,11 @@ namespace D_Parser.Resolver
 
 	public class AssocArrayType : DerivedDataType
 	{
-		public readonly AbstractType KeyType;
+		readonly BaseTypeResolutionVisitor.Wrapper keyType;
+		public AbstractType KeyType
+		{
+			get { return keyType; }
+		}
 
 		public bool IsString
 		{
@@ -324,16 +341,14 @@ namespace D_Parser.Resolver
 		public AbstractType ValueType { get { return Base; } }
 
 		public AssocArrayType(AbstractType ValueType, AbstractType KeyType)
-			: base(ValueType)
+			: base(ValueType, true)
 		{
-			if (ValueType != null)
-				ValueType.NonStaticAccess = true;
-			this.KeyType = KeyType;
+			this.keyType = new BaseTypeResolutionVisitor.Wrapper(KeyType);
 		}
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new AssocArrayType(cloneBase && Base != null ? Base.Clone(true) : Base, cloneBase && KeyType != null ? KeyType.Clone(true) : KeyType);
+			return new AssocArrayType(CloneBase(cloneBase), keyType.Clone(cloneBase));
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -383,34 +398,39 @@ namespace D_Parser.Resolver
 		public readonly bool IsFunction;
 		public readonly ISyntaxRegion delegateTypeBase;
 		public bool IsFunctionLiteral { get { return delegateTypeBase is FunctionLiteral; } }
-		public AbstractType[] Parameters { get; set; }
+		readonly BaseTypeResolutionVisitor.Wrapper[] parameters;
+		public IEnumerable<AbstractType> Parameters {
+			get
+			{
+				foreach (var p in parameters)
+					yield return p;
+			}
+		}
 
-		public DelegateType(AbstractType ReturnType,DelegateDeclaration Declaration, IEnumerable<AbstractType> Parameters = null) : base(ReturnType)
+		public DelegateType(AbstractType ReturnType,DelegateDeclaration Declaration, IEnumerable<AbstractType> Parameters = null) : base(ReturnType, true)
 		{
 			delegateTypeBase = Declaration;
 
 			this.IsFunction = Declaration.IsFunction;
-			if (ReturnType != null)
-				ReturnType.NonStaticAccess = true;
 
-			if (Parameters is AbstractType[])
-				this.Parameters = (AbstractType[])Parameters;
-			else if(Parameters!=null)
-				this.Parameters = Parameters.ToArray();
+			var l = new List<BaseTypeResolutionVisitor.Wrapper>();
+			if (Parameters != null)
+				foreach (var p in Parameters)
+					l.Add(p);
+			parameters = l.ToArray();
 		}
 
 		public DelegateType(AbstractType ReturnType, FunctionLiteral Literal, IEnumerable<AbstractType> Parameters)
-			: base(ReturnType)
+			: base(ReturnType, true)
 		{
 			delegateTypeBase = Literal;
 			this.IsFunction = Literal.LiteralToken == DTokens.Function;
-			if (ReturnType != null)
-				ReturnType.NonStaticAccess = true;
-			
-			if (Parameters is AbstractType[])
-				this.Parameters = (AbstractType[])Parameters;
-			else if (Parameters != null)
-				this.Parameters = Parameters.ToArray();
+
+			var l = new List<BaseTypeResolutionVisitor.Wrapper>();
+			if (Parameters != null)
+				foreach (var p in Parameters)
+					l.Add(p);
+			parameters = l.ToArray();
 		}
 
 		public AbstractType ReturnType { get { return Base; } }
@@ -419,9 +439,9 @@ namespace D_Parser.Resolver
 		{
 			//TODO: Clone parameters
 			if (IsFunctionLiteral)
-				return new DelegateType (cloneBase && Base != null ? Base.Clone (true) : Base, delegateTypeBase as FunctionLiteral, Parameters);
+				return new DelegateType (CloneBase(cloneBase), delegateTypeBase as FunctionLiteral, Parameters);
 			
-			return new DelegateType(cloneBase && Base != null ? Base.Clone(true) : Base, delegateTypeBase as DelegateDeclaration, Parameters);
+			return new DelegateType(CloneBase(cloneBase), delegateTypeBase as DelegateDeclaration, Parameters);
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -450,33 +470,27 @@ namespace D_Parser.Resolver
 			get{ return definition.IsAlive; }
 		}
 
-		public ReadOnlyCollection<TemplateParameterSymbol> DeducedTypes {
-			get;
-			private set;
+		List<TemplateParameterSymbol> deducedTemplateParameters;
+		public IEnumerable<TemplateParameterSymbol> DeducedTypes {
+			get { return deducedTemplateParameters; }
 		}
-		public bool HasDeducedTypes {get{ return DeducedTypes.Count != 0; }}
+		public bool HasDeducedTypes {get{ return deducedTemplateParameters.Count != 0; }}
 
 		public void SetDeducedTypes(IEnumerable<TemplateParameterSymbol> s)
 		{
-			if (s == null) {
-				DeducedTypes = new ReadOnlyCollection<TemplateParameterSymbol>(new List<TemplateParameterSymbol>(0));
-				return;
-			}
+			deducedTemplateParameters = new List<TemplateParameterSymbol> ();
 
-			var l = new List<TemplateParameterSymbol> ();
-
-			foreach (var tps in s)
-				if (tps != null && tps != this && tps.Base != this)
-					l.Add (tps);
-
-			DeducedTypes = new ReadOnlyCollection<TemplateParameterSymbol> (l);
+			if(s != null)
+				foreach (var tps in s)
+					if (tps != null && tps != this && tps.Base != this)
+						deducedTemplateParameters.Add (tps);
 		}
 
 		public readonly int NameHash;
 		public string Name {get{return Strings.TryGet (NameHash);}}
 
-		protected DSymbol(DNode Node, AbstractType BaseType, IEnumerable<TemplateParameterSymbol> deducedTypes)
-			: base(BaseType)
+		protected DSymbol(DNode Node, AbstractType BaseType, IEnumerable<TemplateParameterSymbol> deducedTypes, bool setBaseNonStaticAccess = false)
+			: base(BaseType, setBaseNonStaticAccess)
 		{
 			SetDeducedTypes (deducedTypes);
 			
@@ -499,9 +513,7 @@ namespace D_Parser.Resolver
 		public new DVariable Definition { get { return base.Definition as DVariable; } }
 
 		public AliasedType(DVariable AliasDefinition, AbstractType Type, IEnumerable<TemplateParameterSymbol> deducedTypes = null)
-			: base(AliasDefinition, Type, deducedTypes) {
-				if (Type != null)
-					Type.NonStaticAccess = false;
+			: base(AliasDefinition, Type, deducedTypes, false) {
 		}
 
 		public override string ToString()
@@ -511,7 +523,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new AliasedType(Definition, cloneBase && Base != null ? Base.Clone(true) : Base, DeducedTypes) { Modifier = Modifier };
+			return new AliasedType(Definition, CloneBase(true), DeducedTypes) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -544,7 +556,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new EnumType(Definition, cloneBase && Base != null ? Base.Clone(true) : Base) { Modifier = Modifier };
+			return new EnumType(Definition, CloneBase(cloneBase)) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -560,7 +572,7 @@ namespace D_Parser.Resolver
 
 	public class StructType : TemplateIntermediateType
 	{
-		public StructType(DClassLike dc, IEnumerable<TemplateParameterSymbol> deducedTypes = null) : base(dc, null, null, deducedTypes) { }
+		public StructType(DClassLike dc, IEnumerable<AbstractType> baseInterfaces, IEnumerable<TemplateParameterSymbol> deducedTypes = null) : base(dc, null, null, deducedTypes) { }
 
 		public override string ToString()
 		{
@@ -569,7 +581,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new StructType(Definition, DeducedTypes) { Modifier = Modifier };
+			return new StructType(Definition, CloneBaseInterfaces(cloneBase), DeducedTypes) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -611,7 +623,7 @@ namespace D_Parser.Resolver
 	public class ClassType : TemplateIntermediateType
 	{
 		public ClassType(DClassLike dc, 
-			TemplateIntermediateType baseType, InterfaceType[] baseInterfaces = null,
+			AbstractType baseType, IEnumerable<AbstractType> baseInterfaces = null,
 			IEnumerable<TemplateParameterSymbol> deducedTypes = null)
 			: base(dc, baseType, baseInterfaces, deducedTypes)
 		{}
@@ -623,7 +635,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new ClassType(Definition, cloneBase && Base != null ? Base.Clone(true) as TemplateIntermediateType : Base as TemplateIntermediateType, BaseInterfaces, DeducedTypes) { Modifier = Modifier };
+			return new ClassType(Definition, CloneBase(cloneBase), CloneBaseInterfaces(cloneBase), DeducedTypes) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -640,13 +652,13 @@ namespace D_Parser.Resolver
 	public class InterfaceType : TemplateIntermediateType
 	{
 		public InterfaceType(DClassLike dc, 
-			InterfaceType[] baseInterfaces=null,
+			IEnumerable<AbstractType> baseInterfaces=null,
 			IEnumerable<TemplateParameterSymbol> deducedTypes = null) 
 			: base(dc, null, baseInterfaces, deducedTypes) {}
 		
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new InterfaceType(Definition, BaseInterfaces, DeducedTypes) { Modifier = Modifier };
+			return new InterfaceType(Definition, CloneBaseInterfaces(cloneBase), DeducedTypes) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -721,17 +733,71 @@ namespace D_Parser.Resolver
 
 	public abstract class TemplateIntermediateType : UserDefinedType
 	{
-		public ISyntaxRegion instanciationSyntax;
 		public new DClassLike Definition { get { return base.Definition as DClassLike; } }
 
-		public readonly InterfaceType[] BaseInterfaces;
+		readonly List<BaseTypeResolutionVisitor.Wrapper> baseInterfaceWrappers = new List<BaseTypeResolutionVisitor.Wrapper>();
+
+		bool HashCheckedBaseTypeForInterface;
+		bool HasOnlyBaseInterfaces = false;
+		public override AbstractType Base
+		{
+			get
+			{
+				if (HasOnlyBaseInterfaces)
+					return null;
+
+				CheckForBaseInterfaceInBaseType();
+
+				return base.Base;
+			}
+		}
+
+		void CheckForBaseInterfaceInBaseType()
+		{
+			if (HashCheckedBaseTypeForInterface)
+				return;
+			HashCheckedBaseTypeForInterface = true;
+
+			var b = base.Base;
+
+			if (b is InterfaceType)
+			{
+				baseInterfaceWrappers.Insert(0, new BaseTypeResolutionVisitor.Wrapper(b));
+				HasOnlyBaseInterfaces = true;
+			}
+		}
+
+		public IEnumerable<InterfaceType> BaseInterfaces
+		{
+			get {
+				CheckForBaseInterfaceInBaseType();
+				foreach (var i in baseInterfaceWrappers)
+					yield return (AbstractType)i as InterfaceType;
+			}
+		}
 
 		public TemplateIntermediateType(DClassLike dc, 
-			AbstractType baseType, InterfaceType[] baseInterfaces,
+			AbstractType baseType, IEnumerable<AbstractType> baseInterfaces,
 			IEnumerable<TemplateParameterSymbol> deducedTypes)
 			: base(dc, baseType, deducedTypes)
 		{
-			this.BaseInterfaces = baseInterfaces;
+			if (baseInterfaces != null)
+				foreach (var i in baseInterfaces)
+					this.baseInterfaceWrappers.Add(i);
+		}
+
+		protected List<AbstractType> CloneBaseInterfaces(bool cloneBase)
+		{
+			var l = new List<AbstractType>();
+
+			// See CheckForBaseInterfaceInBaseType
+			bool skipFirst = HashCheckedBaseTypeForInterface && baseInterfaceWrappers.Count != 0 &&
+				baseInterfaceWrappers[0].GetWithoutResolution() == Base;
+
+			foreach (var i in baseInterfaceWrappers.Skip(skipFirst ? 1 : 0))
+				l.Add(i.Clone(cloneBase));
+
+			return l;
 		}
 	}
 
@@ -778,7 +844,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new StaticProperty(Definition, cloneBase && Base != null ? Base.Clone(true) : Base, ValueGetter);
+			return new StaticProperty(Definition, CloneBase(cloneBase), ValueGetter);
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -795,15 +861,13 @@ namespace D_Parser.Resolver
 	public class MemberSymbol : DSymbol
 	{
 		public MemberSymbol(DNode member, AbstractType memberType = null,
-			IEnumerable<TemplateParameterSymbol> deducedTypes = null)
-			: base(member, memberType, deducedTypes) {
-				if (memberType != null)
-					memberType.NonStaticAccess = true;
+			IEnumerable<TemplateParameterSymbol> deducedTypes = null, bool setBaseNonStaticAccess = true)
+			: base(member, memberType, deducedTypes, setBaseNonStaticAccess) {
 		}
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new MemberSymbol(Definition, cloneBase && Base != null ? Base.Clone(true) : Base, DeducedTypes) { Modifier = Modifier };
+			return new MemberSymbol(Definition, CloneBase(cloneBase), DeducedTypes) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -841,26 +905,15 @@ namespace D_Parser.Resolver
 			this.Parameter = tpn;
 			this.ParameterValue = typeOrValue as ISymbolValue;
 		}
-		/*
-		public TemplateParameterSymbol(TemplateParameter tp,
-			ISemantic representedTypeOrValue,
-			ISyntaxRegion originalParameterIdentifier = null,
-			DNode parentNode = null)
-			: base(new TemplateParameterNode(tp) { Parent = parentNode },
-			AbstractType.Get(representedTypeOrValue), originalParameterIdentifier ?? tp)
-		{
-			this.Parameter = tp;
-			this.ParameterValue = representedTypeOrValue as ISymbolValue;
-		}*/
 
 		public override string ToString()
 		{
-			return "<"+(Parameter == null ? "(unknown)" : Parameter.Name)+">"+(ParameterValue!=null ? ParameterValue.ToString() : (Base==null ? "" : Base.ToString()));
+			return "<"+(Parameter == null ? "(unknown)" : Parameter.Name)+">"+(ParameterValue!=null ? ParameterValue.ToString() : (Base ==null ? "" : Base.ToString()));
 		}
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new TemplateParameterSymbol(Parameter, ParameterValue ?? (cloneBase && Base != null ? Base.Clone(true) : Base) as ISemantic) { Modifier = Modifier };
+			return new TemplateParameterSymbol(Parameter, ParameterValue ?? CloneBase(cloneBase) as ISemantic) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -887,7 +940,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new ArrayAccessSymbol(indexExpression, cloneBase && Base != null ? Base.Clone(true) : Base);
+			return new ArrayAccessSymbol(indexExpression, CloneBase(cloneBase));
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)
@@ -910,7 +963,7 @@ namespace D_Parser.Resolver
 			set	{}
 		}
 
-		public ModuleSymbol(DModule mod, PackageSymbol packageBase = null) : base(mod, packageBase, (IEnumerable<TemplateParameterSymbol>)null) {	}
+		public ModuleSymbol(DModule mod, PackageSymbol packageBase = null) : base(mod, packageBase, null) {	}
 
 		public override string ToString()
 		{
@@ -919,7 +972,7 @@ namespace D_Parser.Resolver
 
 		public override AbstractType Clone(bool cloneBase)
 		{
-			return new ModuleSymbol(Definition, cloneBase && Base != null ? Base.Clone(true) as PackageSymbol : Base as PackageSymbol) { Modifier = Modifier };
+			return new ModuleSymbol(Definition, CloneBase(cloneBase) as PackageSymbol) { Modifier = Modifier };
 		}
 
 		public override void Accept(IResolvedTypeVisitor vis)

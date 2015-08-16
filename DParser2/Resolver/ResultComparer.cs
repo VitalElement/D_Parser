@@ -69,18 +69,15 @@ namespace D_Parser.Resolver
 				if(dg1.IsFunctionLiteral != dg2.IsFunctionLiteral || 
 				   !IsEqual(dg1.ReturnType, dg2.ReturnType))
 					return false;
-				
-				if(dg1.Parameters == null || dg1.Parameters.Length == 0)
-					return dg2.Parameters == null || dg2.Parameters.Length==0;
-				else if(dg2.Parameters == null)
-					return dg1.Parameters == null || dg1.Parameters.Length==0;
-				else if(dg1.Parameters.Length == dg2.Parameters.Length)
-				{
-					for(int i = dg1.Parameters.Length-1; i != 0; i--)
-						if(!IsEqual(dg1.Parameters[i], dg2.Parameters[i]))
-							return false;
-					return true;
-				}
+
+				var it1 = dg1.Parameters.GetEnumerator();
+				var it2 = dg2.Parameters.GetEnumerator();
+
+				while (it1.MoveNext() && it2.MoveNext())
+					if (!IsEqual(it1.Current, it2.Current))
+						return false;
+
+				return !it1.MoveNext() && !it2.MoveNext();
 			}
 
 			//TODO: Handle other types
@@ -214,14 +211,10 @@ namespace D_Parser.Resolver
 			{
 				var templateType = (TemplateIntermediateType)r;
 
-				if (templateType.BaseInterfaces != null &&
-					templateType.BaseInterfaces.Length != 0 &&
-					target is InterfaceType)
-				{
+				if (target is InterfaceType)
 					foreach (var I in templateType.BaseInterfaces)
 						if (IsImplicitlyConvertible(I, target))
 							return true;
-				}
 			}
 
 			return false;

@@ -187,8 +187,7 @@ namespace D_Parser.Resolver.ExpressionSemantics
 							var l = new List<AbstractType>();
 							if (udt.Base != null)
 								l.Add(udt.Base);
-							if (udt.BaseInterfaces != null && udt.BaseInterfaces.Length != 0)
-								l.AddRange(udt.BaseInterfaces);
+							l.AddRange(udt.BaseInterfaces);
 
 							res = new DTuple(l);
 						}

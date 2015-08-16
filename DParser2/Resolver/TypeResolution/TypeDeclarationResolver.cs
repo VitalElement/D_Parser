@@ -381,6 +381,8 @@ namespace D_Parser.Resolver.TypeResolution
 				if (v.Type is IdentifierDeclaration)
 					ctxt.CurrentContext.ContextDependentOptions |= ResolutionOptions.NoTemplateParameterDeduction;
 
+
+
 				bt = TypeDeclarationResolver.ResolveSingle(v.Type, ctxt);
 
 				ctxt.CurrentContext.ContextDependentOptions = optBackup;
@@ -616,7 +618,7 @@ namespace D_Parser.Resolver.TypeResolution
 				switch (dc.ClassType)
 				{
 					case DTokens.Struct:
-						return new StructType(dc, invisibleTypeParams);
+						return new StructType(dc, null, invisibleTypeParams);
 
 					case DTokens.Union:
 						return new UnionType(dc, invisibleTypeParams);

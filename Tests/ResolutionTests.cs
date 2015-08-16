@@ -1589,7 +1589,7 @@ int delegate(int b) myDeleg;
 			mr = r as MemberSymbol;
 			Assert.That(r, Is.TypeOf(typeof(MemberSymbol)));
 
-			var v = mr.DeducedTypes[2].ParameterValue;
+			var v = mr.DeducedTypes.ElementAt(2).ParameterValue;
 			Assert.That(v, Is.TypeOf(typeof(PrimitiveValue)));
 			Assert.AreEqual(5M, ((PrimitiveValue)v).Value);
 
@@ -1642,11 +1642,11 @@ class Client : IClient!(Params, ConcreteRegistry){}");
 			Assert.IsInstanceOfType( typeof(ClassType),ct.Base);
 			ct = (ClassType)ct.Base;
 
-			Assert.AreEqual(ct.DeducedTypes.Count, 2);
-			var dedtype = ct.DeducedTypes[0];
+			Assert.AreEqual(ct.DeducedTypes.Count(), 2);
+			var dedtype = ct.DeducedTypes.ElementAt(0);
 			Assert.AreEqual("P", dedtype.Name);
 			Assert.AreEqual(mod["Params"].First(),((DSymbol)dedtype.Base).Definition);
-			dedtype = ct.DeducedTypes[1];
+			dedtype = ct.DeducedTypes.ElementAt(1);
 			Assert.AreEqual("R", dedtype.Name);
 			Assert.AreEqual(mod["ConcreteRegistry"].First(), ((DSymbol)dedtype.Base).Definition);
 
@@ -1672,13 +1672,13 @@ class D : C!B {}");
 			var ctxt = CreateDefCtxt(pcl, mod);
 
 			var res = TypeDeclarationResolver.HandleNodeMatch(mod["D"].First(), ctxt);
-			Assert.IsInstanceOfType(typeof(ClassType),res);
+			Assert.That(res, Is.TypeOf(typeof(ClassType)));
 			var ct = (ClassType)res;
 
-			Assert.IsInstanceOfType(typeof(ClassType),ct.Base);
+			Assert.That(ct.Base,Is.TypeOf(typeof(ClassType)));
 			ct = (ClassType)ct.Base;
 
-			Assert.AreEqual(1, ct.DeducedTypes.Count);
+			Assert.AreEqual(1, ct.DeducedTypes.Count());
 		}
 		
 		[Test]
@@ -1854,7 +1854,7 @@ V foo3(V)(V v) {}");
 			Assert.That(t, Is.TypeOf(typeof(MemberSymbol)));
 			ms = t as MemberSymbol;
 			Assert.That(ms.DeducedTypes, Is.Not.Null);
-			Assert.That(ms.DeducedTypes[0].Base, Is.TypeOf(typeof(PrimitiveType)));
+			Assert.That(ms.DeducedTypes.ElementAt(0).Base, Is.TypeOf(typeof(PrimitiveType)));
 		}
 
 		[Test]
@@ -1934,10 +1934,10 @@ class C(U: A!W, W){ W item; }
 
 			Assert.That(t, Is.TypeOf(typeof(ClassType)));
 			var ct = t as ClassType;
-			Assert.That(ct.DeducedTypes.Count, Is.EqualTo(2));
-			Assert.That(ct.DeducedTypes[0].Name, Is.EqualTo("U"));
-			Assert.That(ct.DeducedTypes[1].Name, Is.EqualTo("W"));
-			Assert.That(ct.DeducedTypes[1].Base, Is.TypeOf(typeof(PrimitiveType)));
+			Assert.That(ct.DeducedTypes.Count(), Is.EqualTo(2));
+			Assert.That(ct.DeducedTypes.ElementAt(0).Name, Is.EqualTo("U"));
+			Assert.That(ct.DeducedTypes.ElementAt(1).Name, Is.EqualTo("W"));
+			Assert.That(ct.DeducedTypes.ElementAt(1).Base, Is.TypeOf(typeof(PrimitiveType)));
 
 			td = DParser.ParseBasicType("C!(A!string)");
 			t = RS(td, ctxt);
@@ -2027,7 +2027,7 @@ void main() {
 			var x = DParser.ParseExpression("Print!(1,'a',6.8)");
 			var t = ExpressionTypeEvaluation.EvaluateType(x,ctxt);
 			Assert.That(t, Is.TypeOf(typeof(TemplateType)));
-			var tps = (t as TemplateType).DeducedTypes[0] as TemplateParameterSymbol;
+			var tps = (t as TemplateType).DeducedTypes.ElementAt(0) as TemplateParameterSymbol;
 			Assert.That(tps, Is.Not.Null);
 			Assert.That(tps.Base, Is.TypeOf(typeof(DTuple)));
 			var tt = tps.Base as DTuple;
@@ -2047,7 +2047,7 @@ void main() {
 			x = DParser.ParseExpression("tplWrite(1, 'a', 6.8)");
 			t = ExpressionTypeEvaluation.EvaluateType(x, ctxt);
 			Assert.That(t, Is.TypeOf(typeof(MemberSymbol)));
-			tps = (t as MemberSymbol).DeducedTypes[0] as TemplateParameterSymbol;
+			tps = (t as MemberSymbol).DeducedTypes.ElementAt(0) as TemplateParameterSymbol;
 			Assert.That(tps, Is.Not.Null);
 			Assert.That(tps.Base, Is.TypeOf(typeof(DTuple)));
 			tt = tps.Base as DTuple;
@@ -2057,7 +2057,7 @@ void main() {
 			x = DParser.ParseExpression("tplWrite2(\"asdf\", 'a', 6.8)");
 			t = ExpressionTypeEvaluation.EvaluateType(x, ctxt);
 			Assert.That(t, Is.TypeOf(typeof(MemberSymbol)));
-			tps = (t as MemberSymbol).DeducedTypes[0] as TemplateParameterSymbol;
+			tps = (t as MemberSymbol).DeducedTypes.ElementAt(0) as TemplateParameterSymbol;
 			Assert.That(tps, Is.Not.Null);
 			Assert.That(tps.Base, Is.TypeOf(typeof(DTuple)));
 			tt = tps.Base as DTuple;
@@ -2753,7 +2753,7 @@ alias bar aliasTwo;
 			Assert.That(t, Is.TypeOf(typeof(MemberSymbol)));
 			Assert.That(ms.Base, Is.TypeOf(typeof(PointerType)));
 
-			Assert.That(ms.DeducedTypes[0].Base, Is.TypeOf(typeof(PointerType)));
+			Assert.That(ms.DeducedTypes.ElementAt(0).Base, Is.TypeOf(typeof(PointerType)));
 
 			x = DParser.ParseExpression("aliasTwo");
 			t = ExpressionTypeEvaluation.EvaluateType(x, ctxt);
@@ -4202,7 +4202,7 @@ template BlackHole(Base)
 			t = ExpressionTypeEvaluation.EvaluateType(x, ctxt, false);
 
 			Assert.That (t, Is.TypeOf (typeof(ClassType)));
-			Assert.That ((t as ClassType).BaseInterfaces[0], Is.TypeOf(typeof(InterfaceType)));
+			Assert.That ((t as ClassType).BaseInterfaces.ElementAt(0), Is.TypeOf(typeof(InterfaceType)));
 
 			x = DParser.ParseExpression("yorp.foo");
 			t = ExpressionTypeEvaluation.EvaluateType(x, ctxt, false);
@@ -4297,7 +4297,7 @@ void main(string[] args) { }
 			Assert.That(t, Is.TypeOf(typeof(MixinTemplateType)));
 			var MyTemplate = t as MixinTemplateType;
 			var MyTemplateDef = MyTemplate.Definition as DClassLike;
-			var firstDeducedParam = MyTemplate.DeducedTypes[0];
+			var firstDeducedParam = MyTemplate.DeducedTypes.ElementAt(0);
 			Assert.That((firstDeducedParam.Definition as TemplateParameter.Node).TemplateParameter, Is.SameAs(MyTemplateDef.TemplateParameters[0]));
 			Assert.That(firstDeducedParam.Base, Is.TypeOf(typeof(StructType)));
 		

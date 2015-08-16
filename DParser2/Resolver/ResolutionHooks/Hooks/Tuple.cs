@@ -88,7 +88,7 @@ namespace D_Parser.Resolver.ResolutionHooks
 			}
 
 			n = tupleStruct;
-			return new StructType(tupleStruct, ded.Count != 0 ? ded.Values : null);
+			return new StructType(tupleStruct, null, ded.Count != 0 ? ded.Values : null);
 
 			//TODO: Ensure renaming and other AST-based things run properly
 		}

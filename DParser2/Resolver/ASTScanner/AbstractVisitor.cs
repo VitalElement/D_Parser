@@ -292,9 +292,8 @@ to avoid op­er­a­tions which are for­bid­den at com­pile time.",
 			if(t is InterfaceType)
 				l.Add(t as InterfaceType);
 			
-			if(t.BaseInterfaces != null && t.BaseInterfaces.Length != 0)
-				foreach (var nested in t.BaseInterfaces)
-					EnlistInterfaceHierarchy(l, nested);
+			foreach (var nested in t.BaseInterfaces)
+				EnlistInterfaceHierarchy(l, nested);
 		}
 
 		static bool IsAnonEnumOrClass(INode n)
