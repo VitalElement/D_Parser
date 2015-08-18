@@ -38,7 +38,8 @@ namespace D_Parser.Resolver.Templates
 				return;
 
 			foreach (var tps in tpss)
-				Remove (tps.Parameter);
+				if(tps != null)
+					Remove (tps.Parameter);
 		}
 
 		public void AddDefault(IEnumerable<TemplateParameter> templateParameters)
@@ -51,13 +52,20 @@ namespace D_Parser.Resolver.Templates
 					this [tp] = new TemplateParameterSymbol (tp, null);
 		}
 
+		public void Add(DeducedTypeDictionary dtd)
+		{
+			foreach (var kv in dtd)
+				this [kv.Key] = kv.Value;
+		}
+
 		public void Add(IEnumerable<TemplateParameterSymbol> tpss)
 		{
 			if (tpss == null)
 				return;
 
 			foreach (var tps in tpss)
-				this [tps.Parameter] = tps;
+				if(tps != null)
+					this [tps.Parameter] = tps;
 		}
 
 		public bool AllParamatersSatisfied
