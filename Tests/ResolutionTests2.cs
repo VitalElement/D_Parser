@@ -22,6 +22,7 @@ namespace Tests
 	public partial class ResolutionTests
 	{
 		#region Template Parameter-related
+		[Ignore]
 		[Test]
 		/// <summary>
 		/// https://github.com/aBothe/D_Parser/issues/192
