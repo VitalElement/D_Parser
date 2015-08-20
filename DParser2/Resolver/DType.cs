@@ -936,7 +936,7 @@ namespace D_Parser.Resolver
 		public readonly PostfixExpression_ArrayAccess indexExpression;
 
 		public ArrayAccessSymbol(PostfixExpression_ArrayAccess indexExpr, AbstractType arrayValueType):
-		base(arrayValueType)	{ this.indexExpression = indexExpr; }
+		base(arrayValueType, true)	{ this.indexExpression = indexExpr; }
 
 		public override AbstractType Clone(bool cloneBase)
 		{

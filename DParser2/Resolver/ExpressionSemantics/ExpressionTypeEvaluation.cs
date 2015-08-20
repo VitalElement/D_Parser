@@ -724,9 +724,6 @@ namespace D_Parser.Resolver.ExpressionSemantics
 				 * return the value type of a given array result
 				 */
 				//TODO: Handle opIndex overloads
-				if (ar.ValueType != null)
-					ar.ValueType.NonStaticAccess = true;
-
 				return new ArrayAccessSymbol(x, ar.ValueType);
 			}
 			/*
