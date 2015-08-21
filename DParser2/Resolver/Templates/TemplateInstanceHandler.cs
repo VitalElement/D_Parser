@@ -404,7 +404,7 @@ namespace D_Parser.Resolver.TypeResolution
 			DeducedTypeDictionary deducedTypes,
 			ResolutionContext ctxt)
 		{
-			return new Templates.TemplateParameterDeduction(deducedTypes, ctxt).Handle(handledParameter, argumentToCheck);
+			return TemplateParameterDeduction.Deduce(handledParameter, argumentToCheck, deducedTypes, ctxt);
 		}
 
 		static bool CheckAndDeduceTypeTuple(TemplateTupleParameter tupleParameter, 
@@ -412,7 +412,7 @@ namespace D_Parser.Resolver.TypeResolution
 			DeducedTypeDictionary deducedTypes,
 			ResolutionContext ctxt)
 		{
-			return new Templates.TemplateParameterDeduction(deducedTypes,ctxt).Handle(tupleParameter,typeChain);
+			return TemplateParameterDeduction.Deduce(tupleParameter, new DTuple(typeChain), deducedTypes,ctxt);
 		}
 	}
 }

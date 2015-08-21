@@ -121,7 +121,7 @@ namespace D_Parser.Resolver
 					{
 						var dedParam = new DeducedTypeDictionary(par);
 
-						return new TemplateParameterDeduction(dedParam, ctxt).Handle(tpn.TemplateParameter, resToCheck);
+						return TemplateParameterDeduction.Deduce(tpn.TemplateParameter, resToCheck, dedParam, ctxt);
 					}
 				}
 			}

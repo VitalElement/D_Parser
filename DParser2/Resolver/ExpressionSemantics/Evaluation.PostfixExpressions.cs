@@ -305,7 +305,6 @@ namespace D_Parser.Resolver.ExpressionSemantics
 				return;
 
 			var deducedTypeDict = new DeducedTypeDictionary(ms);
-			var templateParamDeduction = new TemplateParameterDeduction(deducedTypeDict, ctxt);
 
 			var back = ctxt.ScopedBlock;
 			using (ctxt.Push(ms))
@@ -328,7 +327,8 @@ namespace D_Parser.Resolver.ExpressionSemantics
 							continue;
 						else if (currentArg < callArguments.Count)
 						{
-							if (!(add = templateParamDeduction.HandleDecl(null, paramType, callArguments[currentArg++])))
+							var typ = new TemplateTypeParameter(0, CodeLocation.Empty, null){ Specialization = paramType };
+							if (!(add = TemplateParameterDeduction.Deduce(typ, callArguments[currentArg++], deducedTypeDict, ctxt)))
 								break;
 						}
 						else
@@ -354,7 +354,7 @@ namespace D_Parser.Resolver.ExpressionSemantics
 				{
 					foreach (var tpar in dm.TemplateParameters)
 					{
-						if (deducedTypeDict[tpar] == null && !templateParamDeduction.Handle(tpar, null))
+						if (deducedTypeDict[tpar] == null && !TemplateParameterDeduction.Deduce(tpar, null, deducedTypeDict, ctxt))
 							return;
 					}
 				}

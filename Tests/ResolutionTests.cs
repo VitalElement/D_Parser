@@ -2110,17 +2110,23 @@ void foo(U)(U u)
 	tmplFoo2!(int[])(123);
 	tmplFoo2!U(123);
 }");
-			
+			IExpression ex;
+			AbstractType[] t;
+			AbstractType t_;
 			var foo = pcl.FirstPackage()["A"]["foo"].First() as DMethod;
 			var ctxt = CreateDefCtxt(pcl, foo, foo.Body);
 			var subSt = foo.Body.SubStatements as List<IStatement>;
 
-			var ex = (subSt[0] as ExpressionStatement).Expression;
-			var t = ExpressionTypeEvaluation.GetOverloads(ex  as TemplateInstanceExpression, ctxt, null, true);
+			ex = (subSt[2] as ExpressionStatement).Expression;
+			t_ = ExpressionTypeEvaluation.EvaluateType(ex, ctxt);
+			Assert.That(t_, Is.TypeOf(typeof(PointerType)));
+
+			ex = (subSt[0] as ExpressionStatement).Expression;
+			t = ExpressionTypeEvaluation.GetOverloads(ex  as TemplateInstanceExpression, ctxt, null, true);
 			Assert.That(t, Is.Not.Null);
 			Assert.That(t.Length, Is.EqualTo(1));
 			
-			var t_ = ExpressionTypeEvaluation.EvaluateType(ex, ctxt);
+			t_ = ExpressionTypeEvaluation.EvaluateType(ex, ctxt);
 			Assert.That(t_, Is.TypeOf(typeof(PrimitiveType)));
 			
 			ex = (subSt[1] as ExpressionStatement).Expression;

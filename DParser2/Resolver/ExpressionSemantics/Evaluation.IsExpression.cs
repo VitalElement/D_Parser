@@ -39,6 +39,84 @@ namespace D_Parser.Resolver.ExpressionSemantics
 			return new PrimitiveValue(retTrue);
 		}
 
+		class IsExpressionParameterDeduction : TemplateParameterDeduction
+		{
+			/// <summary>
+			/// If true and deducing a type parameter,
+			/// the equality of the given and expected type is required instead of their simple convertibility.
+			/// Used when evaluating IsExpressions.
+			/// </summary>
+			public bool checkTypeEqualityOnIdentifiers;
+			public TemplateParameter paramToPreferIfNamedEqually;
+
+			IsExpressionParameterDeduction(DeducedTypeDictionary dtd, ResolutionContext ctxt) : base(dtd, ctxt)
+			{
+			}
+
+			public static bool DeduceIs(TemplateParameter paramToPreferIfNamedEqually, AbstractType typeToInduce, DeducedTypeDictionary dtd, ResolutionContext ctxt, bool checkTypeEqualityOnIdentifiers = false)
+			{
+				var ded = new IsExpressionParameterDeduction(dtd, ctxt);
+				ded.paramToPreferIfNamedEqually = paramToPreferIfNamedEqually;
+				ded.checkTypeEqualityOnIdentifiers = checkTypeEqualityOnIdentifiers;
+
+				return ded.Deduce(paramToPreferIfNamedEqually, typeToInduce);
+			}
+
+			new bool Set(TemplateParameter p, ISemantic r, int nameHash)
+			{
+				return base.Set(p,r,nameHash);
+			}
+
+			protected override TypeParamInduction CreateTypeParamInductionVisitor()
+			{
+				return new SpecialTypeParamInduction(this);
+			}
+
+			protected class SpecialTypeParamInduction : TypeParamInduction
+			{
+				new IsExpressionParameterDeduction deduction
+				{ 
+					get
+					{ 
+						return base.deduction as IsExpressionParameterDeduction;
+					}
+				}
+
+				public SpecialTypeParamInduction(IsExpressionParameterDeduction ded) : base(ded) {}
+
+				public override bool Visit(IdentifierDeclaration id)
+				{
+					var r = resolvedThingToInduceFrom;
+					var deducee = DResolver.StripMemberSymbols(resolvedTypeToInduceFrom) as DSymbol;
+
+					// Bottom-level reached
+					if (id.InnerDeclaration == null && IsExpectingParameter(id.IdHash) && !id.ModuleScoped)
+					{
+						// Associate template param with r
+						return deduction.Set(id.IdHash == deduction.paramToPreferIfNamedEqually.NameHash ? deduction.paramToPreferIfNamedEqually : null, r, id.IdHash);
+					}
+
+					if (id.InnerDeclaration != null && deducee != null && deducee.Definition.NameHash == id.IdHash)
+					{
+						var physicalParentType = TypeDeclarationResolver.HandleNodeMatch(deducee.Definition.Parent, deduction.ctxt, null, id.InnerDeclaration);
+						if (Accept(id.InnerDeclaration, physicalParentType))
+						{
+							if (IsExpectingParameter(id.IdHash))
+								deduction.Set(id.IdHash == deduction.paramToPreferIfNamedEqually.NameHash ? deduction.paramToPreferIfNamedEqually : null, deducee, id.IdHash);
+							return true;
+						}
+					}
+
+					// If not stand-alone identifier or is not required as template param, resolve the id and compare it against r
+					var _r = TypeDeclarationResolver.ResolveSingle(id, deduction.ctxt);
+
+					return _r != null && (deduction.checkTypeEqualityOnIdentifiers ?
+						ResultComparer.IsEqual(r,_r) :
+						ResultComparer.IsImplicitlyConvertible(r,_r));
+				}
+			}
+		}
+
 		private bool evalIsExpression_WithAliases(IsExpression isExpression, AbstractType typeToCheck)
 		{
 			/*
@@ -46,48 +124,34 @@ namespace D_Parser.Resolver.ExpressionSemantics
 			 * in order to find aliases and/or specified template parameters!
 			 */
 
-			var expectedTemplateParams = new TemplateParameter[isExpression.TemplateParameterList == null  ? 1 : (isExpression.TemplateParameterList.Length + 1)];
-			expectedTemplateParams [0] = isExpression.ArtificialFirstSpecParam;
-			if(expectedTemplateParams.Length > 1)
-				isExpression.TemplateParameterList.CopyTo (expectedTemplateParams, 1);
+			var expectedTemplateParams = new TemplateParameter[isExpression.TemplateParameterList == null ? 1 : (isExpression.TemplateParameterList.Length + 1)];
+			expectedTemplateParams[0] = isExpression.ArtificialFirstSpecParam;
+			if (expectedTemplateParams.Length > 1)
+				isExpression.TemplateParameterList.CopyTo(expectedTemplateParams, 1);
 
 			var tpl_params = new DeducedTypeDictionary(expectedTemplateParams);
 
-
-			var tpd = new TemplateParameterDeduction(tpl_params, ctxt);
-			bool retTrue = false;
-
-			if (isExpression.EqualityTest) // 6.
+			if (isExpression.EqualityTest && isExpression.TypeSpecialization == null) // 6b
 			{
-				// a)
-				if (isExpression.TypeSpecialization != null)
-				{
-					tpd.EnforceTypeEqualityWhenDeducing = true;
-					retTrue = tpd.Handle(isExpression.ArtificialFirstSpecParam, typeToCheck);
-					tpd.EnforceTypeEqualityWhenDeducing = false;
-				}
-				else // b)
-				{
-					var r = evalIsExpression_EvalSpecToken(isExpression, typeToCheck, true);
-					retTrue = r.Item1;
-					tpl_params[isExpression.ArtificialFirstSpecParam] = new TemplateParameterSymbol(isExpression.ArtificialFirstSpecParam, r.Item2);
-				}
+				var r = evalIsExpression_EvalSpecToken(isExpression, typeToCheck, true);
+				if (!r.Item1)
+					return false;
+				tpl_params[isExpression.ArtificialFirstSpecParam] = new TemplateParameterSymbol(isExpression.ArtificialFirstSpecParam, r.Item2);
 			}
-			else // 5.
-				retTrue = tpd.Handle(isExpression.ArtificialFirstSpecParam, typeToCheck);
 
-			if (retTrue && isExpression.TemplateParameterList != null)
+			// isExpression.EqualityTest==true:  6a, otherwise case 5
+			if (!IsExpressionParameterDeduction.DeduceIs(isExpression.ArtificialFirstSpecParam, typeToCheck, tpl_params, ctxt, isExpression.EqualityTest))
+				return false;
+
+			if (isExpression.TemplateParameterList != null)
 				foreach (var p in isExpression.TemplateParameterList)
-					if (!tpd.Handle(p, tpl_params[p] != null ? tpl_params[p].Base : null))
+					if (!IsExpressionParameterDeduction.DeduceIs(p, tpl_params[p] != null ? tpl_params[p].Base : null, tpl_params, ctxt))
 						return false;
 
-			if (retTrue)
-			{
-				foreach (var kv in tpl_params)
-					ctxt.CurrentContext.DeducedTemplateParameters[kv.Key] = kv.Value;
-			}
+			foreach (var kv in tpl_params)
+				ctxt.CurrentContext.DeducedTemplateParameters[kv.Key] = kv.Value;
 
-			return retTrue;
+			return true;
 		}
 
 		private bool evalIsExpression_NoAlias(IsExpression isExpression, AbstractType typeToCheck)

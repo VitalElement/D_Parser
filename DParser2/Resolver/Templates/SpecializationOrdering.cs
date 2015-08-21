@@ -184,7 +184,7 @@ namespace D_Parser.Resolver.Templates
 				return true;
 
 			// Now try to fit the virtual Type t2 into t1 - and return true if it's possible
-			return new TemplateParameterDeduction(new DeducedTypeDictionary(), ctxt).Handle(t2, t1_TypeResults);
+			return TemplateParameterDeduction.Deduce(t2, t1_TypeResults, new DeducedTypeDictionary(), ctxt);
 		}
 	}
 }
