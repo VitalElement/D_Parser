@@ -25,6 +25,15 @@ namespace Tests
 	/// </summary>
 	public class CompletionTests
 	{
+		[SetUp]
+		public void SetupEnvironment()
+		{
+			var co = CompletionOptions.Instance;
+
+			co.CompletionTimeout = -1;
+			co.DisableMixinAnalysis = false;
+		}
+
 		[Test]
 		public void ForStatement()
 		{
