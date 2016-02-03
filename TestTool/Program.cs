@@ -38,11 +38,11 @@ namespace TestTool
 			return;*/
 			//DParser.ParseString (@"");
 			//(new ResolutionTests ()).BasicResolution0 ();
-			//(new IndentationTests ()).TestIssue576 ();		
+			//(new IndentationTests ()).TestIssue576 ();
 			//(new IndentationTests ()).SwitchIndentation ();
 
 			//BotanProfil.Run ();
-			rt.LooseResolution2();
+			rt.ConstNonConstParamDistinguishingSO();
 
 			Trace.Flush ();
 			return;
@@ -53,18 +53,18 @@ namespace TestTool
 			var line = 4;
 			var ind = D_Parser.Formatting.Indent.IndentEngineWrapper.CalculateIndent(code, line, false, 4);
 			var o = DocumentHelper.LocationToOffset(code, line,1);
-			
+
 			var o2 = o;
 			while(o2 < code.Length && code[o2] == ' ' || code[o2] == '\t')
 				o2++;
-			
+
 			code = code.Substring(0,o) + ind + code.Substring(o2);
 			Console.Write(code+"|");
-			
+
 			Console.ReadKey(true);
 			return;*/
 
-			
+
 			// Phobos & Druntime parsing
 
 			Console.WriteLine ("Begin parsing...");
@@ -112,13 +112,13 @@ namespace TestTool
 			Console.Write("Press any key to continue . . . ");
 			Console.ReadKey(true);
 		}
-		
+
 		static void formattingTests()
 		{
 			var policy = new DFormattingOptions();
 			policy.TypeBlockBraces = BraceStyle.NextLine;
 			policy.MultiVariableDeclPlacement = NewLinePlacement.SameLine;
-			
+
 			var code = @"
 class A
 {
@@ -148,8 +148,8 @@ body{
 ;
 
 }
-@safe int[] 
-d 
+@safe int[]
+d
 =
 34;
 int a=12,b=23,c;
@@ -159,9 +159,9 @@ int a=12,b=23,c;
 void foo(string[] args) {}
 }";
 			Console.WriteLine("## Formatting ##");
-			
+
 			var ast = D_Parser.Parser.DParser.ParseString(code) as DModule;
-			
+
 			var sw = new Stopwatch();
 			sw.Start();
 			code = Formatter.FormatCode(code, ast, null, policy);
